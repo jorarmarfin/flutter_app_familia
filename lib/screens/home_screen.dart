@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app_familia/screens/components/background_screen.dart';
 import 'package:flutter_app_familia/themes/app_theme.dart';
 import 'package:go_router/go_router.dart';
+
+import 'components/components.dart';
 
 class HomeScreen extends StatelessWidget {
   static const routeName = 'home_screen';
@@ -9,7 +10,7 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       body: Stack(
         children: [
           BackgroundScreen(),
@@ -22,22 +23,8 @@ class HomeScreen extends StatelessWidget {
               SizedBox(height: 40),
               FamilyList(),
               SizedBox(height: 40),
-              OptionsList(),
-              Container(
-                alignment: Alignment.center,
-                height: 60,
-                decoration: appBoxDecoration,
-                child: Row(
-                  children: [
-                    IconButton(onPressed: () {
-                    }, icon: Icon(Icons.home)),
-                    IconButton(onPressed: () {
-                    }, icon: Icon(Icons.home)),
-                    IconButton(onPressed: () {
-                    }, icon: Icon(Icons.home)),
-                  ],
-                ),
-              )
+              Expanded(child: OptionsList()),
+              FooterMenu()
             ],
           ),
         ],
@@ -55,9 +42,14 @@ class OptionsList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
         child: ListView(children: const [
-      OptionMenu(),
-      OptionMenu(),
-      OptionMenu(),
+      OptionMenu(
+          nameMenu: 'Gastos',
+          routeMenu: 'spends_screen',
+          iconMenu: Icons.add_shopping_cart),
+      OptionMenu(
+          nameMenu: 'Presupuesto',
+          routeMenu: 'presupuesto_screen',
+          iconMenu: Icons.monetization_on),
     ]));
   }
 }
@@ -65,35 +57,31 @@ class OptionsList extends StatelessWidget {
 class OptionMenu extends StatelessWidget {
   const OptionMenu({
     super.key,
+    required this.nameMenu,
+    required this.routeMenu,
+    required this.iconMenu,
   });
+  final String nameMenu;
+  final String routeMenu;
+  final IconData iconMenu;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(10),
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        decoration: BoxDecoration(
-            color: appWhiteColor,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey
-                    .withOpacity(0.5), // Color de la sombra
-                spreadRadius: 1, // Radio de expansión de la sombra
-                blurRadius: 6, // Desenfoque de la sombra
-                offset: const Offset(
-                    0, 3), // Cambios de posición de la sombra
-              ),
-            ]),
+        decoration: appBoxDecorationWhitShadow,
         child: ListTile(
-            leading: const Icon(Icons.person, color: appBlackColor),
-            title: const Text('Presupuesto'),
+            leading: Icon(
+              iconMenu,
+              color: appBlackColor,
+              size: 40,
+            ),
+            title: Text(nameMenu),
             trailing: const Icon(Icons.arrow_forward_ios, color: appBlackColor),
             onTap: () {
-              context.pushNamed('/budget');
-            }
-        )
-    );
+              context.pushNamed(routeMenu);
+            }));
   }
 }
 
@@ -110,11 +98,17 @@ class FamilyList extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         children: const [
           SizedBox(width: 20),
-          FamiliarContainer(),
+          FamiliarContainer(
+            id: '0',nameFamily: 'Luis',imageFamily: 'luis.jpg',
+          ),
           SizedBox(width: 20),
-          FamiliarContainer(),
+          FamiliarContainer(
+            id: '1',nameFamily: 'Lucy ',imageFamily: 'lucy.jpg'
+          ),
           SizedBox(width: 20),
-          FamiliarContainer(),
+          FamiliarContainer(
+            id: '2',nameFamily: 'Francisco',imageFamily: 'francisco.jpg'
+          ),
         ],
       ),
     );
@@ -124,46 +118,32 @@ class FamilyList extends StatelessWidget {
 class FamiliarContainer extends StatelessWidget {
   const FamiliarContainer({
     super.key,
+    required this.id, required this.nameFamily, required this.imageFamily,
   });
-
+  final String id;
+  final String nameFamily;
+  final String imageFamily;
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 170,
-      height: 190,
-      decoration: appBoxDecoration,
-      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Image.asset('assets/images/img_tmp.jpg', width: 100, height: 100),
-        const SizedBox(height: 10),
-        const Text(
-          'Luis Mayta',
-          style: TextStyle(
-            color: appBlackColor,
-            fontSize: 20,
+    return InkWell(
+      onTap: () {
+        context.pushNamed('familiar_screen', pathParameters: {'id': id});
+      },
+      child: Container(
+        width: 170,
+        height: 190,
+        decoration: appBoxDecoration,
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Image.asset('assets/images/$imageFamily', width: 100, height: 100),
+          const SizedBox(height: 10),
+          Text(
+            nameFamily,
+            style:const TextStyle(
+              color: appBlackColor,
+              fontSize: 20,
+            ),
           ),
-        ),
-      ]),
-    );
-  }
-}
-
-class TitleApp extends StatelessWidget {
-  final String titleName;
-  const TitleApp({
-    super.key,
-    required this.titleName,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        titleName,
-        style: const TextStyle(
-          color: appWhiteColor,
-          fontSize: 30,
-          fontWeight: FontWeight.bold,
-        ),
+        ]),
       ),
     );
   }
