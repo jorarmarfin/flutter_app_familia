@@ -1,10 +1,10 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_familia/infrastructure/models/presupuesto_model.dart';
 import 'package:flutter_app_familia/screens/components/components.dart';
 import 'package:flutter_app_familia/themes/app_theme.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:go_router/go_router.dart';
+
 class PresupuestoScreen extends StatelessWidget {
   static const routeName = 'presupuesto_screen';
   const PresupuestoScreen({super.key});
@@ -22,6 +22,7 @@ class PresupuestoScreen extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 80),
         child: FloatingActionButton(
           onPressed: () {
+            showFormDialog(context);
           },
           backgroundColor: appWhiteColor,
           child: const Icon(Icons.add),
@@ -41,6 +42,77 @@ class PresupuestoScreen extends StatelessWidget {
       )
     );
   }
+  void showFormDialog(BuildContext context) {
+    final TextEditingController nombreController = TextEditingController();
+    final TextEditingController cantidadController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Formulario'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                TextFormField(
+                  controller: nombreController,
+                  decoration: const InputDecoration(hintText: 'Nombre'),
+                ),
+                TextFormField(
+                  controller: cantidadController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(hintText: 'Cantidad'),
+                ),
+                // Agrega más campos de formulario según necesites
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancelar'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Enviar'),
+              onPressed: () {
+                // Obtener los valores de los controladores de texto
+                String nombre = nombreController.text;
+                int cantidad = int.tryParse(cantidadController.text) ?? 0;
+                // Llamar a la función para crear un nuevo registro
+                createNewRecord(nombre.toUpperCase(), cantidad);
+                context.pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+  void createNewRecord(String nombre, int cantidad) {
+    FirebaseDatabase database = FirebaseDatabase.instance;
+    DatabaseReference ref = database.ref("presupuesto");
+
+    // Crear un nuevo id único para el nuevo registro
+    String? newRecordId = ref.push().key;
+
+    // Definir el nuevo registro
+    Map<String, dynamic> nuevoRegistro = {
+      "nombre": nombre,
+      "cantidad": cantidad,
+    };
+    // Insertar el nuevo registro en la base de datos
+    ref.child(newRecordId!).set(nuevoRegistro).then((_) {
+        const SnackBar(
+          content: Text('A SnackBar has been shown.'),
+        );
+
+    }).catchError((error) {
+      SnackBar(
+        content: Text("Ha ocurrido un error: $error"),
+      );
+    });
+  }
 }
 class ListaPresupuestos extends StatelessWidget {
   final dbRef = FirebaseDatabase.instance.ref().child('presupuesto');
@@ -56,9 +128,10 @@ class ListaPresupuestos extends StatelessWidget {
           Map<dynamic, dynamic> map = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
           List<PresupuestoModel> presupuestos = [];
           map.forEach((key, value) {
-            var presupuesto = PresupuestoModel.fromMap(Map<dynamic, dynamic>.from(value));
+            var presupuesto = PresupuestoModel.fromMap(Map<dynamic, dynamic>.from(value),key);
             presupuestos.add(presupuesto);
           });
+          presupuestos = presupuestos.reversed.toList();
           return ListView.builder(
             itemCount: presupuestos.length,
             itemBuilder: (context, index) {
@@ -68,6 +141,16 @@ class ListaPresupuestos extends StatelessWidget {
                 child: ListTile(
                   title: Text(presupuestos[index].nombre),
                   subtitle: Text('Cantidad: ${presupuestos[index].cantidad}'),
+                  trailing: IconButton(
+                    icon: const CircleAvatar(
+                      backgroundColor: appRedColor,
+                        radius: 20,
+                        child: Icon(Icons.delete,color: appWhiteColor,)
+                    ),
+                    onPressed: () {
+                      dbRef.child(presupuestos[index].id).remove();
+                    },
+                  )
                 ),
               );
             },
@@ -78,4 +161,5 @@ class ListaPresupuestos extends StatelessWidget {
       },
     );
   }
+
 }
