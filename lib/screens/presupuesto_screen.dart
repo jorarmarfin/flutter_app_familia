@@ -3,45 +3,72 @@ import 'package:flutter_app_familia/infrastructure/models/presupuesto_model.dart
 import 'package:flutter_app_familia/screens/components/components.dart';
 import 'package:flutter_app_familia/themes/app_theme.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class PresupuestoScreen extends StatelessWidget {
+import '../providers/family_provider.dart';
+
+class PresupuestoScreen extends ConsumerWidget {
   static const routeName = 'presupuesto_screen';
   const PresupuestoScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final presupuestosAsyncValue = ref.watch(presupuestoStreamProvider);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Presupuesto', style:TextStyle(color: appWhiteColor),),
-        centerTitle: true,
-        backgroundColor: appRedColor,
-        iconTheme: const IconThemeData(color: appWhiteColor),
-      ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 80),
-        child: FloatingActionButton(
-          onPressed: () {
-            showFormDialog(context);
-          },
-          backgroundColor: appWhiteColor,
-          child: const Icon(Icons.add),
-        ),
-      ),
-      body: Stack(
-        children: [
-          const BackgroundScreen(),
-          Column(
-            children: [
-              const SizedBox(height: 40),
-              Expanded(child: ListaPresupuestos()),
-              const FooterMenu()
-            ],
+        appBar: AppBar(
+          title: const Text(
+            'Presupuesto',
+            style: TextStyle(color: appWhiteColor),
           ),
-        ],
-      )
-    );
+          centerTitle: true,
+          backgroundColor: appRedColor,
+          iconTheme: const IconThemeData(color: appWhiteColor),
+        ),
+        floatingActionButton: Padding(
+          padding: const EdgeInsets.only(bottom: 80),
+          child: FloatingActionButton(
+            onPressed: () {
+              showFormDialog(context);
+            },
+            backgroundColor: appWhiteColor,
+            child: const Icon(Icons.add),
+          ),
+        ),
+        body: Stack(
+          children: [
+            const BackgroundScreen(),
+            Column(
+              children: [
+                Expanded(child: ListaPresupuestos()),
+                SizedBox(
+                  child: Container(
+                    padding: const EdgeInsets.only(left: 20, right: 20, top: 5),
+                    decoration: appBoxDecoration,
+                    child: presupuestosAsyncValue.when(
+                      data: (List<PresupuestoModel> presupuestos) {
+                        final total = presupuestos.fold(
+                            0, (sum, item) => sum + item.cantidad);
+                        return Text(
+                          'Total de presupuesto: S/.${total.toString()}',
+                          style: const TextStyle(
+                              color:
+                                  appRedColor), // Asumiendo que appWhiteColor es un color definido previamente
+                        );
+                      },
+                      loading: () => const Text('Calculando...'),
+                      error: (error, stack) => Text('Error: $error'),
+                    ),
+                  ),
+                ),
+                const FooterMenu()
+              ],
+            ),
+          ],
+        ));
   }
+
   void showFormDialog(BuildContext context) {
     final TextEditingController nombreController = TextEditingController();
     final TextEditingController cantidadController = TextEditingController();
@@ -89,6 +116,7 @@ class PresupuestoScreen extends StatelessWidget {
       },
     );
   }
+
   void createNewRecord(String nombre, int cantidad) {
     FirebaseDatabase database = FirebaseDatabase.instance;
     DatabaseReference ref = database.ref("presupuesto");
@@ -103,17 +131,22 @@ class PresupuestoScreen extends StatelessWidget {
     };
     // Insertar el nuevo registro en la base de datos
     ref.child(newRecordId!).set(nuevoRegistro).then((_) {
-        const SnackBar(
-          content: Text('A SnackBar has been shown.'),
-        );
-
+      const SnackBar(
+        content: Text('A SnackBar has been shown.'),
+      );
     }).catchError((error) {
       SnackBar(
         content: Text("Ha ocurrido un error: $error"),
       );
     });
   }
+
+  int calcularTotalPresupuesto(List<PresupuestoModel> presupuestos) {
+    final dbRef = FirebaseDatabase.instance.ref().child('presupuesto');
+    return presupuestos.fold(0, (sum, item) => sum + item.cantidad);
+  }
 }
+
 class ListaPresupuestos extends StatelessWidget {
   final dbRef = FirebaseDatabase.instance.ref().child('presupuesto');
 
@@ -124,34 +157,56 @@ class ListaPresupuestos extends StatelessWidget {
     return StreamBuilder(
       stream: dbRef.onValue,
       builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
-        if (snapshot.hasData && !snapshot.hasError && snapshot.data!.snapshot.value != null) {
-          Map<dynamic, dynamic> map = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
+        if (snapshot.hasData &&
+            !snapshot.hasError &&
+            snapshot.data!.snapshot.value != null) {
+          Map<dynamic, dynamic> map =
+              snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
           List<PresupuestoModel> presupuestos = [];
           map.forEach((key, value) {
-            var presupuesto = PresupuestoModel.fromMap(Map<dynamic, dynamic>.from(value),key);
+            var presupuesto = PresupuestoModel.fromMap(
+                Map<dynamic, dynamic>.from(value), key);
             presupuestos.add(presupuesto);
           });
-          presupuestos = presupuestos.reversed.toList();
+          presupuestos.sort((a, b) => a.nombre.compareTo(b.nombre));
           return ListView.builder(
             itemCount: presupuestos.length,
             itemBuilder: (context, index) {
               return Container(
-                margin: const EdgeInsets.all(10),
+                margin: const EdgeInsets.all(5),
                 decoration: appBoxDecoration,
                 child: ListTile(
-                  title: Text(presupuestos[index].nombre),
-                  subtitle: Text('Cantidad: ${presupuestos[index].cantidad}'),
-                  trailing: IconButton(
-                    icon: const CircleAvatar(
-                      backgroundColor: appRedColor,
-                        radius: 20,
-                        child: Icon(Icons.delete,color: appWhiteColor,)
+                    title: Text(presupuestos[index].nombre),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Cantidad: ${presupuestos[index].cantidad}'),
+                        Text('Queda: ${presupuestos[index].cantidad}'),
+                      ],
                     ),
-                    onPressed: () {
-                      dbRef.child(presupuestos[index].id).remove();
-                    },
-                  )
-                ),
+                    leading: IconButton(
+                      icon: const Icon(
+                        Icons.add_circle_outline,
+                        color: appRedColor,
+                        size: 40,
+                      ),
+                      onPressed: () {
+                        context.pushNamed('spend_screen',
+                            pathParameters: {'id': presupuestos[index].id});
+                      },
+                    ),
+                    trailing: IconButton(
+                      icon: const CircleAvatar(
+                          backgroundColor: appRedColor,
+                          radius: 20,
+                          child: Icon(
+                            Icons.delete,
+                            color: appWhiteColor,
+                          )),
+                      onPressed: () {
+                        dbRef.child(presupuestos[index].id).remove();
+                      },
+                    )),
               );
             },
           );
@@ -161,5 +216,4 @@ class ListaPresupuestos extends StatelessWidget {
       },
     );
   }
-
 }

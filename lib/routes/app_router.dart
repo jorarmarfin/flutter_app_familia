@@ -20,6 +20,13 @@ final appRouter = GoRouter(initialLocation: '/', routes: <RouteBase>[
     builder: (context, state) => const PresupuestoScreen(),
   ),
   GoRoute(
+    path: '/spend/:id',
+    name: SpendScreen.routeName,
+    builder: (context, state) => SpendScreen(
+      spendId: state.pathParameters['id']??'1',
+    ),
+  ),
+  GoRoute(
       path: '/spends',
       name: SpendsScreen.routeName,
       builder: (context, state) => const SpendsScreen()),
