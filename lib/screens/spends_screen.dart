@@ -25,14 +25,14 @@ class SpendsScreen extends StatelessWidget {
           child: const Icon(Icons.add),
         ),
       ),
-      body: Stack(
+      body: const Stack(
         children: [
-          const BackgroundScreen(),
+          BackgroundScreen(),
           Column(
             children: [
-              const SizedBox(height: 40),
+              SizedBox(height: 40),
               //Expanded(child: ListaGastos()),
-              const FooterMenu()
+              FooterMenu()
             ],
           ),
         ],

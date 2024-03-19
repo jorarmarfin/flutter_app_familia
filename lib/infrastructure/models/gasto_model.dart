@@ -1,7 +1,7 @@
 class GastoModel {
   final String id;
   final String concepto;
-  final int monto;
+  final double monto;
   final String presupuestoId;
 
   GastoModel({required this.id, required this.concepto, required this.monto, required this.presupuestoId});
@@ -10,7 +10,7 @@ class GastoModel {
     return GastoModel(
       id: id,
       concepto: data['concepto'] ?? '',
-      monto: data['monto'] ?? 0,
+      monto: (data['monto'] as num).toDouble() ?? 0.0,
       presupuestoId: data['presupuestoId'] ?? '',
     );
   }

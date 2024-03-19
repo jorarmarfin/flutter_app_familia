@@ -1,8 +1,8 @@
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_familia/infrastructure/models/gasto_model.dart';
 import 'package:go_router/go_router.dart';
 
+import '../infrastructure/datasource/firebase_gastos.dart';
 import '../themes/app_theme.dart';
 import 'components/components.dart';
 
@@ -45,24 +45,24 @@ class SpendScreen extends StatelessWidget {
     );
   }
   void showFormDialog(BuildContext context) {
-    final TextEditingController nombreController = TextEditingController();
-    final TextEditingController cantidadController = TextEditingController();
+    final TextEditingController conceptoController = TextEditingController();
+    final TextEditingController montoController = TextEditingController();
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Formulario'),
+          title: const Text('Insertar Gasto'),
           content: SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
                 TextFormField(
-                  controller: nombreController,
-                  decoration: const InputDecoration(hintText: 'Nombre'),
+                  controller: conceptoController,
+                  decoration: const InputDecoration(hintText: 'Concepto'),
                 ),
                 TextFormField(
-                  controller: cantidadController,
+                  controller: montoController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(hintText: 'Cantidad'),
+                  decoration: const InputDecoration(hintText: 'Monto'),
                 ),
                 // Agrega más campos de formulario según necesites
               ],
@@ -79,10 +79,10 @@ class SpendScreen extends StatelessWidget {
               child: const Text('Enviar'),
               onPressed: () {
                 // Obtener los valores de los controladores de texto
-                String nombre = nombreController.text;
-                int cantidad = int.tryParse(cantidadController.text) ?? 0;
+                String concepto = conceptoController.text;
+                double monto = double.tryParse(montoController.text) ?? 0.0;
                 // Llamar a la función para crear un nuevo registro
-                createNewRecord(nombre.toUpperCase(), cantidad);
+                insertarGasto(concepto.toUpperCase(), monto, spendId , context);
                 context.pop();
               },
             ),
@@ -91,33 +91,22 @@ class SpendScreen extends StatelessWidget {
       },
     );
   }
-  void createNewRecord(String nombre, int cantidad) {
-    FirebaseDatabase database = FirebaseDatabase.instance;
-    DatabaseReference ref = database.ref("presupuesto");
-
-    // Crear un nuevo id único para el nuevo registro
-    String? newRecordId = ref.push().key;
-
-    // Definir el nuevo registro
-    Map<String, dynamic> nuevoRegistro = {
-      "nombre": nombre,
-      "cantidad": cantidad,
-    };
-    // Insertar el nuevo registro en la base de datos
-    ref.child(newRecordId!).set(nuevoRegistro).then((_) {
-      const SnackBar(
-        content: Text('A SnackBar has been shown.'),
+  void insertarGasto(String concepto, double monto,String presupuestoId, context) {
+    final dbRef = FirebaseGastos();
+    dbRef.createNewRecord(concepto, monto, presupuestoId  ).then((_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Registro creado con éxito.')),
       );
     }).catchError((error) {
-      SnackBar(
-        content: Text("Ha ocurrido un error: $error"),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Ha ocurrido un error: $error")),
       );
     });
   }
 }
 
 class ListaGastos extends StatelessWidget {
-  final dbRef = FirebaseDatabase.instance.ref().child('gastos');
+  final FirebaseGastos dbRef = FirebaseGastos();
   final String idPresupuesto; // Asumiendo que tienes esta variable
 
   ListaGastos({super.key, required this.idPresupuesto});
@@ -125,17 +114,10 @@ class ListaGastos extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
-      stream: dbRef.onValue,
-      builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
-        if (snapshot.hasData && !snapshot.hasError && snapshot.data!.snapshot.value != null) {
-          Map<dynamic, dynamic> map = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
-          List<GastoModel> gastos = [];
-          map.forEach((key, value) {
-            var gasto = GastoModel.fromMap(Map<dynamic, dynamic>.from(value), key);
-            if (gasto.presupuestoId == idPresupuesto) { // Filtra por idPresupuesto
-              gastos.add(gasto);
-            }
-          });
+      stream: dbRef.getGastosStream(idPresupuesto),
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          List<GastoModel> gastos = snapshot.data!;
           gastos.sort((a, b) => a.concepto.compareTo(b.concepto));
           return ListView.builder(
             itemCount: gastos.length,
@@ -168,7 +150,7 @@ class ListaGastos extends StatelessWidget {
                             color: Colors.white,
                           )),
                       onPressed: () {
-                        dbRef.child(gastos[index].id).remove();
+                        dbRef.eliminarGastoPorId( gastos[index].id );
                       },
                     )
                 ),

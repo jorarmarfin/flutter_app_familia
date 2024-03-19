@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app_familia/infrastructure/models/presupuesto_model.dart';
 import 'package:flutter_app_familia/screens/components/components.dart';
 import 'package:flutter_app_familia/themes/app_theme.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../infrastructure/datasource/firebase_presupuesto.dart';
 import '../providers/family_provider.dart';
 
 class PresupuestoScreen extends ConsumerWidget {
@@ -15,7 +15,7 @@ class PresupuestoScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final presupuestosAsyncValue = ref.watch(presupuestoStreamProvider);
-
+    final dbRef = FirebasePresupuesto();
     return Scaffold(
         appBar: AppBar(
           title: const Text(
@@ -48,8 +48,8 @@ class PresupuestoScreen extends ConsumerWidget {
                     decoration: appBoxDecoration,
                     child: presupuestosAsyncValue.when(
                       data: (List<PresupuestoModel> presupuestos) {
-                        final total = presupuestos.fold(
-                            0, (sum, item) => sum + item.cantidad);
+                        final total =
+                            dbRef.calcularTotalPresupuesto(presupuestos);
                         return Text(
                           'Total de presupuesto: S/.${total.toString()}',
                           style: const TextStyle(
@@ -107,7 +107,7 @@ class PresupuestoScreen extends ConsumerWidget {
                 String nombre = nombreController.text;
                 int cantidad = int.tryParse(cantidadController.text) ?? 0;
                 // Llamar a la función para crear un nuevo registro
-                createNewRecord(nombre.toUpperCase(), cantidad);
+                insertarPresupuesto(nombre.toUpperCase(), cantidad, context);
                 context.pop();
               },
             ),
@@ -117,57 +117,31 @@ class PresupuestoScreen extends ConsumerWidget {
     );
   }
 
-  void createNewRecord(String nombre, int cantidad) {
-    FirebaseDatabase database = FirebaseDatabase.instance;
-    DatabaseReference ref = database.ref("presupuesto");
-
-    // Crear un nuevo id único para el nuevo registro
-    String? newRecordId = ref.push().key;
-
-    // Definir el nuevo registro
-    Map<String, dynamic> nuevoRegistro = {
-      "nombre": nombre,
-      "cantidad": cantidad,
-    };
-    // Insertar el nuevo registro en la base de datos
-    ref.child(newRecordId!).set(nuevoRegistro).then((_) {
-      const SnackBar(
-        content: Text('A SnackBar has been shown.'),
+  void insertarPresupuesto(String nombre, int cantidad, context) {
+    final dbRef = FirebasePresupuesto();
+    dbRef.createNewRecord(nombre, cantidad).then((_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Registro creado con éxito.')),
       );
     }).catchError((error) {
-      SnackBar(
-        content: Text("Ha ocurrido un error: $error"),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Ha ocurrido un error: $error")),
       );
     });
-  }
-
-  int calcularTotalPresupuesto(List<PresupuestoModel> presupuestos) {
-    final dbRef = FirebaseDatabase.instance.ref().child('presupuesto');
-    return presupuestos.fold(0, (sum, item) => sum + item.cantidad);
   }
 }
 
 class ListaPresupuestos extends StatelessWidget {
-  final dbRef = FirebaseDatabase.instance.ref().child('presupuesto');
-
+  final FirebasePresupuesto dbRef = FirebasePresupuesto();
   ListaPresupuestos({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder(
-      stream: dbRef.onValue,
-      builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
-        if (snapshot.hasData &&
-            !snapshot.hasError &&
-            snapshot.data!.snapshot.value != null) {
-          Map<dynamic, dynamic> map =
-              snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
-          List<PresupuestoModel> presupuestos = [];
-          map.forEach((key, value) {
-            var presupuesto = PresupuestoModel.fromMap(
-                Map<dynamic, dynamic>.from(value), key);
-            presupuestos.add(presupuesto);
-          });
+    return StreamBuilder<List<PresupuestoModel>>(
+      stream: dbRef.getPresupuestosStream(),
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          List<PresupuestoModel> presupuestos = snapshot.data!;
           presupuestos.sort((a, b) => a.nombre.compareTo(b.nombre));
           return ListView.builder(
             itemCount: presupuestos.length,
@@ -204,7 +178,7 @@ class ListaPresupuestos extends StatelessWidget {
                             color: appWhiteColor,
                           )),
                       onPressed: () {
-                        dbRef.child(presupuestos[index].id).remove();
+                        dbRef.eliminarPresupuestoPorId(presupuestos[index].id);
                       },
                     )),
               );
