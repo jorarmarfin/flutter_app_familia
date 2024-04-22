@@ -31,14 +31,33 @@ class FirebaseGastos {
     return gastos.fold(0, (sum, item) => sum + item.monto);
   }
 
-  Future createNewRecord(
-      String concepto, double monto, String presupuestoId) async {
+  Future createNewRecord(String concepto, double monto, String presupuestoId,String fecha) async {
     String? newRecordId = dbRef.push().key;
     Map<String, dynamic> nuevoRegistro = {
       "concepto": concepto,
       "monto": monto,
       "presupuestoId": presupuestoId,
+      "fecha": fecha,
     };
     return dbRef.child(newRecordId!).set(nuevoRegistro);
   }
+
+  Future<double> getSumByPresupuestoId(String presupuestoId) async {
+    double total = 0.0;
+
+    // Realiza la consulta para obtener todos los registros con el mismo presupuestoId
+    Query query = dbRef.orderByChild('presupuestoId').equalTo(presupuestoId);
+
+    // Ejecutar la consulta y calcular la suma de los montos
+    DataSnapshot snapshot = await query.get();
+    if (snapshot.exists) {
+      Map<dynamic, dynamic> values = snapshot.value as Map<dynamic, dynamic>;
+      values.forEach((key, value) {
+        double monto = double.tryParse(value['monto'].toString()) ?? 0.0;
+        total += monto;
+      });
+    }
+    return total;
+  }
+
 }

@@ -37,7 +37,7 @@ class FirebasePresupuesto {
   /*
   * Crear un nuevo registro en la base de datos
    */
-  Future createNewRecord(String nombre, int cantidad) async {
+  Future createNewRecord(String nombre, int cantidad,int orden) async {
     // Crear un nuevo id único para el nuevo registro
     String? newRecordId = dbRef.push().key;
 
@@ -45,8 +45,21 @@ class FirebasePresupuesto {
     Map<String, dynamic> nuevoRegistro = {
       "nombre": nombre,
       "cantidad": cantidad,
+      "orden": orden,
     };
     // Insertar el nuevo registro en la base de datos
     return dbRef.child(newRecordId!).set(nuevoRegistro);
+  }
+
+  /// Actualizar un registro en la base de datos
+  Future updateRecord(String id, String nombre, int cantidad, int orden) async {
+    // Definir el registro actualizado
+    Map<String, dynamic> updatedRecord = {
+      "nombre": nombre,
+      "cantidad": cantidad,
+      "orden": orden,
+    };
+    // Actualizar el registro en la base de datos
+    return dbRef.child(id).update(updatedRecord);
   }
 }

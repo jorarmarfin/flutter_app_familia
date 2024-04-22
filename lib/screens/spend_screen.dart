@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app_familia/infrastructure/models/gasto_model.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../infrastructure/datasource/firebase_gastos.dart';
+import '../providers/type_spend_provider.dart';
 import '../themes/app_theme.dart';
 import 'components/components.dart';
 
-class SpendScreen extends StatelessWidget {
+class SpendScreen extends ConsumerWidget {
   static const routeName = 'spend_screen';
   const SpendScreen({super.key, required this.spendId});
   final String spendId;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final nameTypeSpend = ref.watch(nameCategorySpendProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Registro Gastos', style:TextStyle(color: appWhiteColor),),
@@ -35,7 +39,9 @@ class SpendScreen extends StatelessWidget {
           const BackgroundScreen(),
           Column(
             children: [
-              const SizedBox(height: 40),
+              const SizedBox(height: 10),
+              Text(nameTypeSpend, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: appWhiteColor)),
+              const SizedBox(height: 10),
               Expanded(child: ListaGastos(idPresupuesto: spendId)),
               const FooterMenu()
             ],
@@ -47,6 +53,9 @@ class SpendScreen extends StatelessWidget {
   void showFormDialog(BuildContext context) {
     final TextEditingController conceptoController = TextEditingController();
     final TextEditingController montoController = TextEditingController();
+    final TextEditingController fechaController = TextEditingController(
+      text: DateFormat('yyyy-MM-dd').format(DateTime.now()),
+    );
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -64,6 +73,25 @@ class SpendScreen extends StatelessWidget {
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(hintText: 'Monto'),
                 ),
+                TextFormField(
+                  controller: fechaController,
+                  decoration: const InputDecoration(hintText: 'Fecha'),
+                  readOnly: true, // Hace el campo de texto de solo lectura
+                  onTap: () async {
+                    DateTime? pickedDate = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (pickedDate != null) {
+                      // Formatea la fecha seleccionada y actualiza el controlador
+                      String formattedDate = DateFormat('yyyy-MM-dd').format(pickedDate);
+                      fechaController.text = formattedDate;
+                    }
+                  },
+                ),
+
                 // Agrega más campos de formulario según necesites
               ],
             ),
@@ -81,8 +109,9 @@ class SpendScreen extends StatelessWidget {
                 // Obtener los valores de los controladores de texto
                 String concepto = conceptoController.text;
                 double monto = double.tryParse(montoController.text) ?? 0.0;
+                String fecha = fechaController.text;
                 // Llamar a la función para crear un nuevo registro
-                insertarGasto(concepto.toUpperCase(), monto, spendId , context);
+                insertarGasto(concepto.toUpperCase(), monto, spendId,fecha , context);
                 context.pop();
               },
             ),
@@ -91,9 +120,9 @@ class SpendScreen extends StatelessWidget {
       },
     );
   }
-  void insertarGasto(String concepto, double monto,String presupuestoId, context) {
+  void insertarGasto(String concepto, double monto,String presupuestoId,String fecha  , context) {
     final dbRef = FirebaseGastos();
-    dbRef.createNewRecord(concepto, monto, presupuestoId  ).then((_) {
+    dbRef.createNewRecord(concepto, monto, presupuestoId,fecha  ).then((_) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Registro creado con éxito.')),
       );
@@ -139,7 +168,7 @@ class ListaGastos extends StatelessWidget {
                 ),
                 child: ListTile(
                     title: Text(gastos[index].concepto),
-                    subtitle: Text('Cantidad: ${gastos[index].monto}'),
+                    subtitle: Text('Costo: ${gastos[index].monto}'),
                     trailing: IconButton(
                       icon: const CircleAvatar(
                         // Asegúrate de tener definidos appRedColor y appWhiteColor o cámbialos por tus colores

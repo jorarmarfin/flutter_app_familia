@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 const Color appWhiteColor = Color(0xFFFFFFFF);
 const Color appRedColor = Color(0xFFC6302C);
 const Color appBlackColor = Color(0xFF000000);
+const Color appBlueColor = Color(0xFF5151E8);
 
 class AppTheme {
   AppTheme();
