@@ -1,7 +1,7 @@
 name: flutter_app_familia
-description: "A new Flutter project."
+description: "App Familiar."
 publish_to: 'none'
-version: 0.1.0
+version: 0.1.2
 
 environment:
   sdk: '>=3.2.6 <4.0.0'

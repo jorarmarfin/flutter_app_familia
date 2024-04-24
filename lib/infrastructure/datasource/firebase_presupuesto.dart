@@ -46,6 +46,7 @@ class FirebasePresupuesto {
       "nombre": nombre,
       "cantidad": cantidad,
       "orden": orden,
+      "saldo": cantidad.toDouble(),
     };
     // Insertar el nuevo registro en la base de datos
     return dbRef.child(newRecordId!).set(nuevoRegistro);

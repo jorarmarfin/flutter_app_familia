@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../infrastructure/datasource/firebase_presupuesto.dart';
+import '../providers/budgetListProvider.dart';
 import '../providers/family_provider.dart';
 import '../providers/type_spend_provider.dart';
 
@@ -151,6 +152,7 @@ class ListaPresupuestos extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(nameCategorySpendProvider);
+    final itemList = ref.watch(itemListProvider);
     return StreamBuilder<List<PresupuestoModel>>(
       stream: dbRef.getPresupuestosStream(),
       builder: (context, snapshot) {
@@ -161,69 +163,31 @@ class ListaPresupuestos extends ConsumerWidget {
             itemCount: presupuestos.length,
             itemBuilder: (context, index) {
               double total = presupuestos[index].cantidad.toDouble();
-              return Container(
-                margin: const EdgeInsets.all(5),
-                decoration: appBoxDecoration,
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(2),
-                    title: Text(
-                      '${presupuestos[index].orden} - ${presupuestos[index].nombre}',
-                      style: const TextStyle(fontSize: 15),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Cantidad: ${presupuestos[index].cantidad}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        TotalMontoWidget(presupuestoId: presupuestos[index].id, total: total , ),
-                      ],
-                    ),
-                    leading: IconButton(
-                      iconSize: 25,
-                      icon: const Icon(
-                        Icons.arrow_forward_ios ,
-                      ),
-                      onPressed: () {
-                        context.pushNamed('spend_screen',
-                            pathParameters: {'id': presupuestos[index].id});
-                        ref.read(nameCategorySpendProvider.notifier).state =
-                            presupuestos[index].nombre;
-                      },
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const CircleAvatar(
-                              backgroundColor: appBlueColor,
-                              radius: 15,
-                              child: Icon(
-                                Icons.edit,
-                                color: appWhiteColor,
-                                size: 15,
-                              )),
-                          onPressed: () {
-                            showUpdateFormDialog(context, presupuestos[index] );
-                          },
-                        ),
-                        IconButton(
-                          icon: const CircleAvatar(
-                              backgroundColor: appRedColor,
-                              radius: 15,
-                              child: Icon(
-                                Icons.delete,
-                                color: appWhiteColor,
-                                size: 15,
-                              )),
-                          onPressed: () {
-                            dbRef.eliminarPresupuestoPorId(
-                                presupuestos[index].id);
-                          },
-                        ),
-                      ],
-                    )),
+              return Dismissible(
+                key: Key(presupuestos[index].id),
+                background: Container(
+                  padding: const EdgeInsets.only(left: 20),
+                  color: appBlueColor,
+                  alignment: Alignment.centerLeft,
+                  child: const Icon(
+                    Icons.edit,
+                    color: appWhiteColor,
+                  ),
+                ),
+                secondaryBackground: Container(
+                  padding: const EdgeInsets.only(right: 20),
+                  color: appRedColor,
+                  alignment: Alignment.centerRight,
+                  child: const Icon(Icons.delete, color: appWhiteColor),
+                ),
+                onDismissed: (direction) {
+                  if (direction == DismissDirection.startToEnd) {
+                    showUpdateFormDialog(context, presupuestos[index]);
+                  } else {
+                    dbRef.eliminarPresupuestoPorId(presupuestos[index].id);
+                  }
+                },
+                child: buildContainer(presupuestos, index, total, context, ref),
               );
             },
           );
@@ -234,7 +198,67 @@ class ListaPresupuestos extends ConsumerWidget {
     );
   }
 
-  void showUpdateFormDialog(BuildContext context, PresupuestoModel presupuesto) {
+  Container buildContainer(List<PresupuestoModel> presupuestos, int index,
+      double total, BuildContext context, WidgetRef ref) {
+    return Container(
+      margin: const EdgeInsets.all(5),
+      decoration: appBoxDecoration,
+      child: ListTile(
+          contentPadding: const EdgeInsets.all(2),
+          title: Text(
+            '${presupuestos[index].orden} - ${presupuestos[index].nombre}',
+            style: const TextStyle(fontSize: 15),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Cantidad: ${presupuestos[index].cantidad}',
+                style: const TextStyle(fontSize: 12),
+              ),
+              Text(
+                'Saldo: ${presupuestos[index].saldo}',
+                style: const TextStyle(fontSize: 12),
+              ),
+
+            ],
+          ),
+          leading: IconButton(
+            iconSize: 25,
+            icon: const Icon(
+              Icons.arrow_forward_ios,
+            ),
+            onPressed: () {
+              context.pushNamed('spend_screen',
+                  pathParameters: {'id': presupuestos[index].id});
+              ref.read(nameCategorySpendProvider.notifier).state =
+                  presupuestos[index].nombre;
+            },
+          ),
+          trailing: PopupMenuButton<String>(
+            onSelected: (String result) {
+              if (result == 'Editar') {
+                showUpdateFormDialog(context, presupuestos[index]);
+              } else {
+                dbRef.eliminarPresupuestoPorId(presupuestos[index].id);
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                value: 'Editar',
+                child: Text('Editar'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'Eliminar',
+                child: Text('Eliminar'),
+              ),
+            ],
+          )),
+    );
+  }
+
+  void showUpdateFormDialog(
+      BuildContext context, PresupuestoModel presupuesto) {
     // Inicializar los controladores con los valores actuales
     final TextEditingController nombreController =
         TextEditingController(text: presupuesto.nombre);
@@ -296,7 +320,8 @@ class ListaPresupuestos extends ConsumerWidget {
     );
   }
 
-  void actualizarPresupuesto(BuildContext context, String id, String nombre, int cantidad, int orden) {
+  void actualizarPresupuesto(
+      BuildContext context, String id, String nombre, int cantidad, int orden) {
     final dbRef = FirebasePresupuesto();
     dbRef.updateRecord(id, nombre, cantidad, orden).then((_) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -308,32 +333,5 @@ class ListaPresupuestos extends ConsumerWidget {
       );
     });
   }
-
 }
 
-class TotalMontoWidget extends StatelessWidget {
-  final String presupuestoId;
-  final double total;
-  const TotalMontoWidget({Key? key, required this.presupuestoId, required this.total, }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final FirebaseGastos dbRefSpend = FirebaseGastos();
-
-    return FutureBuilder<double>(
-      future: dbRefSpend.getSumByPresupuestoId(presupuestoId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Text("Calculando...");
-        } else if (snapshot.hasError) {
-          return Text('Error al calcular: ${snapshot.error}');
-        } else if (snapshot.hasData) {
-          double resto = total - snapshot.data!;
-          return Text('Queda: S/.${resto.toString()}');
-        } else {
-          return const Text('Sin datos');
-        }
-      },
-    );
-  }
-}
